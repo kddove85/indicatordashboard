@@ -1,2 +1,2 @@
 release: python manage.py migrate
-web: gunicorn greyheart.wsgi
+web: gunicorn dashboard.wsgi
