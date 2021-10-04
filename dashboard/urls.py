@@ -21,7 +21,7 @@ from django.views.generic import TemplateView
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
-    path('openapi/', get_schema_view(title="Some Service", description="API for developers who would like to..."), name='openapi-schema'),
+    path('openapi/', get_schema_view(title="Dashboard Indicator Service", description="API for developers who would like to..."), name='openapi-schema'),
     path('', TemplateView.as_view(
         template_name='documentation.html',
         extra_context={'schema_url': 'openapi-schema'}
