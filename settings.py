@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-dsi6sn!k-zwnej$b#qq^*zt1t#s^crk5&*_cft#y#0u*@2qe$c
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'indicatorsdashboardfrontend.herokuapp.com']
-CORS_ORIGIN_ALLOW_ALL = False
+CORS_ORIGIN_ALLOW_ALL = True
 
 
 # Application definition
