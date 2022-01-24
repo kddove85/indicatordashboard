@@ -27,7 +27,8 @@ SECRET_KEY = 'django-insecure-dsi6sn!k-zwnej$b#qq^*zt1t#s^crk5&*_cft#y#0u*@2qe$c
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['indicatorsdashboard.herokuapp.com']
+CORS_ORIGIN_ALLOW_ALL = True
+ALLOWED_HOSTS = ['http://127.0.0.1:3000']
 
 
 # Application definition

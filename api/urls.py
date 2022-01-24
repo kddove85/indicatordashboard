@@ -14,4 +14,5 @@ urlpatterns = [
     path('deficit/', views.get_deficit),
     path('initial_approval/', views.get_initial_approval),
     path('final_approval/', views.get_final_approval),
+    path('temperature/', views.get_temperature),
 ]

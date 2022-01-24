@@ -1,5 +1,4 @@
 from rest_framework.decorators import api_view
-from datetime import date
 from django.http import JsonResponse
 from bs4 import BeautifulSoup
 import requests
@@ -156,10 +155,10 @@ def get_department_spending_data(data):
     for department in departments:
         results[department] = []
     for element in data:
-        if element['agency_nm'] != 'Total':
+        if element['agency_nm'] != 'Total' and element['restmt_flag'] == "N":
             department_name = element['agency_nm']
             department_name = clean_department_name(department_name)
-            results[department_name].append({'date': element['record_fiscal_year'],
+            results[department_name].append({'date': element['stmt_fiscal_year'],
                                              'cost_in_billions': element['net_cost_bil_amt']})
     for item in results:
         results[item].reverse()
@@ -259,6 +258,7 @@ def get_initial_approval(request):
     return JsonResponse(json_data)
 
 
+@api_view(['GET'])
 def get_final_approval(request):
     results = get_approval_data("https://www.presidency.ucsb.edu/statistics/data/final-presidential-job-approval-ratings")
     json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
@@ -283,3 +283,22 @@ def get_approval_data(url):
         except (IndexError, ValueError):
             pass
     return results
+
+
+@api_view(['GET'])
+def get_temperature(request):
+    year = 2025
+    results = get_temperature_data(year)
+    json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
+    return JsonResponse(json_data)
+
+
+def get_temperature_data(year):
+    data_list = []
+    r = requests.get(f'https://www.ncdc.noaa.gov/cag/global/time-series/globe/land_ocean/12/12/1880-{year}/data.json')
+    if r.text == '':
+        return get_temperature_data(year - 1)
+    result_data = json.loads(r.text)
+    for item in result_data['data']:
+        data_list.append({'date': int(item), 'value': float(result_data['data'][item])})
+    return data_list
