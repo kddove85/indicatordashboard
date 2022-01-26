@@ -13,3 +13,5 @@ To kick off the application use
 python manage.py runserver
 ```
 from the root directory
+
+Get the corresponding frontend here: https://github.com/kddove85/IndicatorDashboardFrontend
