@@ -151,7 +151,6 @@ def get_immigration_deportation(request):
     return JsonResponse(json_data)
 
 
-
 @api_view(['GET'])
 def get_department_spending(request):
     url = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/statement_net_cost?sort=-record_date&format=json&page[size]=1000'
@@ -178,8 +177,9 @@ def get_department_spending_data(data):
         if element['agency_nm'] != 'Total' and element['restmt_flag'] == "N":
             department_name = element['agency_nm']
             department_name = clean_department_name(department_name)
-            results[department_name].append({'date': element['stmt_fiscal_year'],
-                                             'cost_in_billions': element['net_cost_bil_amt']})
+            if int(element['stmt_fiscal_year']) > 2008:
+                results[department_name].append({'date': element['stmt_fiscal_year'],
+                                                 'cost_in_billions': element['net_cost_bil_amt']})
     for item in results:
         results[item].reverse()
     return results
