@@ -6,6 +6,9 @@ import json
 import os
 
 
+CONST_YEAR = 2025
+
+
 @api_view(['GET'])
 def get_alpha_cpi(request):
     url = f'https://www.alphavantage.co/query?function=CPI&interval=monthly&apikey={os.getenv("API_KEY")}'
@@ -80,8 +83,7 @@ def get_unemployment_data(data):
 
 @api_view(['GET'])
 def get_immigration(request):
-    year = 2025
-    results = get_immigration_data(year)
+    results = get_immigration_data(CONST_YEAR)
     json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
     return JsonResponse(json_data)
 
@@ -96,7 +98,7 @@ def get_immigration_data(year):
             th = tr.find('th')
             td = tr.find('td')
             try:
-                results.append({'year': th.get_text(), 'value': int(td.get_text().replace(",", ""))})
+                results.append({'year': th.get_text()[0:4], 'value': int(td.get_text().replace(",", ""))})
             except AttributeError:
                 pass
         return results
@@ -108,8 +110,7 @@ def get_immigration_data(year):
 
 @api_view(['GET'])
 def get_deportation(request):
-    year = 2025
-    results = get_deportation_data(year)
+    results = get_deportation_data(CONST_YEAR)
     json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
     return JsonResponse(json_data)
 
@@ -124,12 +125,31 @@ def get_deportation_data(year):
             th = tr.find('th')
             td = tr.find('td')
             try:
-                results.append({'year': th.get_text(), 'value': int(td.get_text().replace(",", ""))})
+                results.append({'year': th.get_text()[0:4], 'value': int(td.get_text().replace(",", ""))})
             except AttributeError:
                 pass
         return results
     except AttributeError:
         return get_deportation_data(year-1)
+
+
+@api_view(['GET'])
+def get_immigration_deportation(request):
+    all_data_dict = {}
+    all_data_list = []
+    immigration_data = get_immigration_data(CONST_YEAR)
+    deportation_data = get_deportation_data(CONST_YEAR)
+    for item in immigration_data:
+        all_data_dict[item['year']] = {'immigration': item['value'], 'deportation': 0}
+    for item in deportation_data:
+        all_data_dict[item['year']]['deportation'] = item['value']
+    for key in all_data_dict.keys():
+        all_data_list.append({'year': key,
+                              'immigration': all_data_dict[key]['immigration'],
+                              'deportation': all_data_dict[key]['deportation']})
+    json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': all_data_list}))
+    return JsonResponse(json_data)
+
 
 
 @api_view(['GET'])
