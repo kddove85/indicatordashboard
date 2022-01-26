@@ -15,5 +15,3 @@ python manage.py runserver
 from the root directory
 
 Get the corresponding frontend here: https://github.com/kddove85/IndicatorDashboardFrontend
-
-![Capture](https://user-images.githubusercontent.com/8304144/151094004-220ec2ef-a79c-4193-a62f-d40e2ca2dafd.PNG)
