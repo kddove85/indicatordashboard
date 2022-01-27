@@ -3,8 +3,9 @@ from . import views
 
 
 urlpatterns = [
-    path('gdp/', views.get_alpha_gdp),
+    path('gdp/', views.get_gdp),
     path('cpi/', views.get_cpi),
+    path('cpi_yearly/', views.get_cpi_yearly),
     path('unemployment/', views.get_unemployment),
     path('immigration/', views.get_immigration),
     path('deportation/', views.get_deportation),

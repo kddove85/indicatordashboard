@@ -1,18 +1,18 @@
 from rest_framework.decorators import api_view
 from django.http import JsonResponse
 from bs4 import BeautifulSoup
-import requests
 import json
 import os
+from requests_cache import CachedSession
 
-
+session = CachedSession()
 CONST_YEAR = 2025
 
 
 @api_view(['GET'])
 def get_alpha_cpi(request):
     url = f'https://www.alphavantage.co/query?function=CPI&interval=monthly&apikey={os.getenv("API_KEY")}'
-    r = requests.get(url)
+    r = session.get(url)
     json_data = r.json()
     return JsonResponse(json_data)
 
@@ -20,7 +20,7 @@ def get_alpha_cpi(request):
 @api_view(['GET'])
 def get_alpha_unemployment(request):
     url = f'https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey={os.getenv("API_KEY")}'
-    r = requests.get(url)
+    r = session.get(url)
     json_data = r.json()
     return JsonResponse(json_data)
 
@@ -28,8 +28,17 @@ def get_alpha_unemployment(request):
 @api_view(['GET'])
 def get_alpha_gdp(request):
     url = f'https://www.alphavantage.co/query?function=REAL_GDP&interval=annual&apikey={os.getenv("API_KEY")}'
-    r = requests.get(url)
+    r = session.get(url)
     json_data = r.json()
+    return JsonResponse(json_data)
+
+
+@api_view(['GET'])
+def get_gdp(request):
+    headers = {'Content-type': 'application/json'}
+    r = session.get(f'https://api.stlouisfed.org/fred/series/observations?series_id=GDP&api_key={os.getenv("FRED_KEY")}&file_type=json', headers=headers)
+    result_data = json.loads(r.text)
+    json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': result_data['observations']}))
     return JsonResponse(json_data)
 
 
@@ -42,7 +51,7 @@ def get_cpi(request):
                        "endyear": "2021",
                        "calculations": True,
                        "annualaverage": False})
-    p = requests.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
+    p = session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
     result_data = json.loads(p.text)
     results = get_cpi_data(result_data)
     json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
@@ -59,6 +68,31 @@ def get_cpi_data(data):
 
 
 @api_view(['GET'])
+def get_cpi_yearly(request):
+    headers = {'Content-type': 'application/json'}
+    data = json.dumps({"registrationkey": os.getenv("REGISTRATION_KEY"),
+                       "seriesid": ['CUUR0000SA0'],
+                       "startyear": "2002",
+                       "endyear": "2021",
+                       "calculations": True,
+                       "annualaverage": False})
+    p = session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
+    result_data = json.loads(p.text)
+    results = get_cpi_data_yearly(result_data)
+    json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
+    return JsonResponse(json_data)
+
+
+def get_cpi_data_yearly(data):
+    results = []
+    for element in reversed(data['Results']['series'][0]['data']):
+        if element['period'] != 'M13':
+            results.append({'date': f"{element['year']}-{element['period'].replace('M', '')}",
+                            'value': float(element['calculations']['pct_changes']['12'])})
+    return results
+
+
+@api_view(['GET'])
 def get_unemployment(request):
     headers = {'Content-type': 'application/json'}
     data = json.dumps({"registrationkey": os.getenv("REGISTRATION_KEY"),
@@ -66,7 +100,7 @@ def get_unemployment(request):
                        "startyear": "2002",
                        "endyear": "2021",
                        "annualaverage": True})
-    p = requests.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
+    p = session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
     result_data = json.loads(p.text)
     results = get_unemployment_data(result_data)
     json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
@@ -90,7 +124,7 @@ def get_immigration(request):
 
 def get_immigration_data(year):
     try:
-        page = requests.get(f'https://www.dhs.gov/immigration-statistics/yearbook/{year}/table1')
+        page = session.get(f'https://www.dhs.gov/immigration-statistics/yearbook/{year}/table1')
         soup = BeautifulSoup(page.content, 'html.parser')
         trs = soup.find('table').find_all('tr')
         results = []
@@ -117,7 +151,7 @@ def get_deportation(request):
 
 def get_deportation_data(year):
     try:
-        page = requests.get(f'https://www.dhs.gov/immigration-statistics/yearbook/{year}/table39')
+        page = session.get(f'https://www.dhs.gov/immigration-statistics/yearbook/{year}/table39')
         soup = BeautifulSoup(page.content, 'html.parser')
         trs = soup.find('table').find_all('tr')
         results = []
@@ -154,7 +188,7 @@ def get_immigration_deportation(request):
 @api_view(['GET'])
 def get_department_spending(request):
     url = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/statement_net_cost?sort=-record_date&format=json&page[size]=1000'
-    r = requests.get(url)
+    r = session.get(url)
     result_data = json.loads(r.text)
     results = get_department_spending_data(result_data['data'])
     json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
@@ -199,7 +233,7 @@ def clean_department_name(department_name):
 @api_view(['GET'])
 def get_monthly_gas_prices(request):
     url = f'https://api.eia.gov/series/?api_key={os.getenv("KEY")}&series_id=PET.EMM_EPMR_PTE_NUS_DPG.M'
-    r = requests.get(url)
+    r = session.get(url)
     result_data = json.loads(r.text)
     results = get_monthly_gas_prices_data(result_data['series'][0]['data'])
     json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': results}))
@@ -224,7 +258,7 @@ def get_executive_orders(request):
 
 
 def get_executive_orders_data():
-    page = requests.get(f'https://www.presidency.ucsb.edu/statistics/data/executive-orders')
+    page = session.get(f'https://www.presidency.ucsb.edu/statistics/data/executive-orders')
     soup = BeautifulSoup(page.content, 'html.parser')
     trs = soup.find('table').find_all('tr')
     results = []
@@ -249,7 +283,7 @@ def get_deficit(request):
 
 
 def get_deficit_data():
-    page = requests.get(f'https://www.presidency.ucsb.edu/statistics/data/federal-budget-receipts-and-outlays')
+    page = session.get(f'https://www.presidency.ucsb.edu/statistics/data/federal-budget-receipts-and-outlays')
     soup = BeautifulSoup(page.content, 'html.parser')
     trs = soup.find('table').find_all('tr')
     results = []
@@ -286,7 +320,7 @@ def get_final_approval(request):
 
 
 def get_approval_data(url):
-    page = requests.get(url)
+    page = session.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
     trs = soup.find('table').find_all('tr')
     results = []
@@ -315,7 +349,7 @@ def get_temperature(request):
 
 def get_temperature_data(year):
     data_list = []
-    r = requests.get(f'https://www.ncdc.noaa.gov/cag/global/time-series/globe/land_ocean/12/12/1880-{year}/data.json')
+    r = session.get(f'https://www.ncdc.noaa.gov/cag/global/time-series/globe/land_ocean/12/12/1880-{year}/data.json')
     if r.text == '':
         return get_temperature_data(year - 1)
     result_data = json.loads(r.text)
