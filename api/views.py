@@ -1,10 +1,15 @@
 from rest_framework.decorators import api_view
 from django.http import JsonResponse
 from bs4 import BeautifulSoup
+from requests_cache import CachedSession
+from datetime import datetime, timedelta
 import json
 import os
-from requests_cache import CachedSession
+import finnhub
+import operator
+import yfinance as yf
 
+earnings = {'time': datetime.now(), 'data': None}
 session = CachedSession()
 CONST_YEAR = 2025
 
@@ -44,11 +49,12 @@ def get_gdp(request):
 
 @api_view(['GET'])
 def get_cpi(request):
+    years = get_years()
     headers = {'Content-type': 'application/json'}
     data = json.dumps({"registrationkey": os.getenv("REGISTRATION_KEY"),
                        "seriesid": ['CUUR0000SA0'],
-                       "startyear": "2002",
-                       "endyear": "2021",
+                       "startyear": years['start_year'],
+                       "endyear": years['current_year'],
                        "calculations": True,
                        "annualaverage": False})
     p = session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
@@ -72,8 +78,8 @@ def get_cpi_yearly(request):
     headers = {'Content-type': 'application/json'}
     data = json.dumps({"registrationkey": os.getenv("REGISTRATION_KEY"),
                        "seriesid": ['CUUR0000SA0'],
-                       "startyear": "2002",
-                       "endyear": "2021",
+                       "startyear": "2005",
+                       "endyear": "2025",
                        "calculations": True,
                        "annualaverage": False})
     p = session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
@@ -94,11 +100,12 @@ def get_cpi_data_yearly(data):
 
 @api_view(['GET'])
 def get_unemployment(request):
+    years = get_years()
     headers = {'Content-type': 'application/json'}
     data = json.dumps({"registrationkey": os.getenv("REGISTRATION_KEY"),
                        "seriesid": ['LNS14000000'],
-                       "startyear": "2002",
-                       "endyear": "2021",
+                       "startyear": years['start_year'],
+                       "endyear": years['current_year'],
                        "annualaverage": True})
     p = session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
     result_data = json.loads(p.text)
@@ -356,3 +363,60 @@ def get_temperature_data(year):
     for item in result_data['data']:
         data_list.append({'date': int(item), 'value': float(result_data['data'][item])})
     return data_list
+
+
+@api_view(['GET'])
+def get_earnings(request):
+    if earnings['data'] is not None and (datetime.now() - earnings['time']).seconds < 3600:
+        return earnings['data']
+    else:
+        today = datetime.now()
+        start = (today - timedelta(days=today.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = (start + timedelta(days=4)).replace(hour=23, minute=59, second=0, microsecond=0)
+        finnhub_client = finnhub.Client(api_key=os.getenv("FIN_KEY"))
+        data = finnhub_client.earnings_calendar(_from=str(start.date()), to=str(end.date()), symbol="", international=False)['earningsCalendar']
+        data_sorted = sorted(data, key=operator.itemgetter('date', 'symbol'))
+        data_final = []
+        for r in data_sorted:
+            stock = yf.Ticker(r['symbol'])
+            history = stock.history(start=start, end=end)
+            if history.empty:
+                continue
+            match r['hour']:
+                case 'bmo':
+                    r['hour'] = 'Before Open'
+                case 'amc':
+                    r['hour'] = 'After Close'
+                case 'dmh':
+                    r['hour'] = 'During Market'
+            try:
+                r['week_opening'] = '{:.2f}'.format(history['Open'][0])
+            except IndexError:
+                r['week_opening'] = None
+            try:
+                r['week_closing'] = '{:.2f}'.format(history['Close'][-1])
+            except IndexError:
+                r['week_closing'] = None
+            if r['week_opening'] and r['week_closing']:
+                r['change'] = '{:.2f}'.format(float(r['week_closing']) - float(r['week_opening']))
+            else:
+                r['change'] = None
+            if r['change']:
+                r['change_percent'] = '{:.2f}'.format((float(r['change']) / float(r['week_opening'])) * 100)
+            else:
+                r['change_percent'] = None
+            r['purchase'] = False
+            if r['epsEstimate']:
+                if r['epsEstimate'] > 1 and r['date'] == str(end.date()):
+                    r['purchase'] = True
+            data_final.append(r)
+            print(r)
+        json_data = json.loads(json.dumps({'status': 'REQUEST_SUCCEEDED', 'data': data_final}))
+        earnings['data'] = JsonResponse(json_data)
+        return JsonResponse(json_data)
+
+
+def get_years():
+    current_year = datetime.now().year
+    start_year = current_year - 15
+    return {'current_year': str(current_year), 'start_year': str(start_year)}
